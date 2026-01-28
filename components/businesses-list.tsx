@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Business, BusinessesResponse } from "@/lib/types";
 import {
   Building2,
@@ -34,11 +46,21 @@ import {
   Clock,
   Tag,
   AlertCircle,
+  Filter,
+  Trash2,
 } from "lucide-react";
 
 interface BusinessesListProps {
   refreshTrigger: number;
   onBusinessesLoaded: (businesses: Business[]) => void;
+}
+
+// Filter state type
+interface Filters {
+  name: string;
+  hasReviews20: boolean;
+  hasPhone: boolean;
+  hasWebsite: boolean;
 }
 
 export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: BusinessesListProps) {
@@ -47,10 +69,40 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [nameFilter, setNameFilter] = useState("");
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+
+  // Filter states
+  const [filters, setFilters] = useState<Filters>({
+    name: "",
+    hasReviews20: false,
+    hasPhone: false,
+    hasWebsite: false,
+  });
+
+  // Debounced filters that actually trigger the API call
+  const [debouncedFilters, setDebouncedFilters] = useState<Filters>(filters);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounce all filters together with 2 second delay
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedFilters(filters);
+      setPage(1); // Reset to page 1 when filters change
+    }, 2000);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [filters]);
 
   const fetchBusinesses = useCallback(async () => {
     setIsLoading(true);
@@ -60,8 +112,21 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
         limit: "10",
         sort_by: sortBy,
         sort_order: sortOrder,
-        ...(nameFilter && { name: nameFilter }),
       });
+
+      // Add filter params
+      if (debouncedFilters.name) {
+        params.set("name", debouncedFilters.name);
+      }
+      if (debouncedFilters.hasReviews20) {
+        params.set("has_reviews_20", "true");
+      }
+      if (debouncedFilters.hasPhone) {
+        params.set("has_phone", "true");
+      }
+      if (debouncedFilters.hasWebsite) {
+        params.set("has_website", "true");
+      }
 
       const response = await fetch(`/api/businesses?${params}`);
       const data: BusinessesResponse = await response.json();
@@ -76,11 +141,31 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
     } finally {
       setIsLoading(false);
     }
-  }, [page, sortBy, sortOrder, nameFilter, onBusinessesLoaded]);
+  }, [page, sortBy, sortOrder, debouncedFilters, onBusinessesLoaded]);
 
   useEffect(() => {
     fetchBusinesses();
   }, [fetchBusinesses, refreshTrigger]);
+
+  // Count active filters
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.name) count++;
+    if (filters.hasReviews20) count++;
+    if (filters.hasPhone) count++;
+    if (filters.hasWebsite) count++;
+    return count;
+  }, [filters]);
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      name: "",
+      hasReviews20: false,
+      hasPhone: false,
+      hasWebsite: false,
+    });
+  };
 
   const handleSort = (column: string) => {
     if (sortBy === column) {
@@ -92,9 +177,8 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
     setPage(1);
   };
 
-  const handleSearch = (value: string) => {
-    setNameFilter(value);
-    setPage(1);
+  const updateFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
   const toggleRowExpansion = (id: string) => {
@@ -107,6 +191,33 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
       }
       return next;
     });
+  };
+
+  const handleDeleteClick = (id: string, name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteConfirm({ id, name });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm) return;
+
+    try {
+      const response = await fetch(`/api/businesses?id=${deleteConfirm.id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        // Remove from local state immediately
+        setBusinesses((prev) => prev.filter((b) => b.id !== deleteConfirm.id));
+        setTotal((prev) => prev - 1);
+      } else {
+        console.error("Failed to delete business");
+      }
+    } catch (error) {
+      console.error("Failed to delete business:", error);
+    } finally {
+      setDeleteConfirm(null);
+    }
   };
 
   const renderStars = (rating: number | null) => {
@@ -188,7 +299,7 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -197,33 +308,99 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
             </CardTitle>
             <CardDescription>{total} total businesses found</CardDescription>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name..."
-                value={nameFilter}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="w-64 pl-8"
-              />
+          <Select
+            value={sortBy}
+            onValueChange={(value) => {
+              setSortBy(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_at">Date Added</SelectItem>
+              <SelectItem value="rating">Rating</SelectItem>
+              <SelectItem value="review_count">Reviews</SelectItem>
+              <SelectItem value="name">Name</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Filter Toolbar */}
+        <div className="flex flex-col gap-3 p-4 bg-muted/50 rounded-lg border">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Filter className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {activeFilterCount} active
+                </Badge>
+              )}
             </div>
-            <Select
-              value={sortBy}
-              onValueChange={(value) => {
-                setSortBy(value);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="created_at">Date Added</SelectItem>
-                <SelectItem value="rating">Rating</SelectItem>
-                <SelectItem value="review_count">Reviews</SelectItem>
-                <SelectItem value="name">Name</SelectItem>
-              </SelectContent>
-            </Select>
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs">
+                Clear all
+              </Button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-6">
+            {/* Search by name */}
+            <div className="flex-1 min-w-[200px] max-w-[300px]">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name..."
+                  value={filters.name}
+                  onChange={(e) => updateFilter("name", e.target.value)}
+                  className="pl-8 h-9"
+                />
+              </div>
+            </div>
+
+            {/* Toggle Switches */}
+            <div className="flex items-center gap-6">
+              {/* Has 20+ reviews */}
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="filter-reviews"
+                  checked={filters.hasReviews20}
+                  onCheckedChange={(checked) => updateFilter("hasReviews20", checked)}
+                />
+                <Label htmlFor="filter-reviews" className="text-sm cursor-pointer flex items-center gap-1">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  20+ reviews
+                </Label>
+              </div>
+
+              {/* Has phone */}
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="filter-phone"
+                  checked={filters.hasPhone}
+                  onCheckedChange={(checked) => updateFilter("hasPhone", checked)}
+                />
+                <Label htmlFor="filter-phone" className="text-sm cursor-pointer flex items-center gap-1">
+                  <Phone className="h-3.5 w-3.5" />
+                  Has phone
+                </Label>
+              </div>
+
+              {/* No website */}
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="filter-website"
+                  checked={filters.hasWebsite}
+                  onCheckedChange={(checked) => updateFilter("hasWebsite", checked)}
+                />
+                <Label htmlFor="filter-website" className="text-sm cursor-pointer flex items-center gap-1">
+                  <Globe className="h-3.5 w-3.5" />
+                  No website
+                </Label>
+              </div>
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -265,6 +442,7 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
                     </TableHead>
                     <TableHead>Social</TableHead>
                     <TableHead>Links</TableHead>
+                    <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -366,12 +544,23 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
                             )}
                           </div>
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => handleDeleteClick(business.id, business.name, e)}
+                            title="Delete business"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
 
                       {/* Expanded Details Row */}
                       {expandedRows.has(business.id) && (
                         <TableRow key={`${business.id}-details`} className="bg-muted/30">
-                          <TableCell colSpan={8} className="p-4">
+                          <TableCell colSpan={9} className="p-4">
                             <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
                               {/* Location & Contact */}
                               <div className="space-y-3">
@@ -542,6 +731,27 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
           </>
         )}
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Business</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteConfirm?.name}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

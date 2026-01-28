@@ -2,6 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { BusinessesResponse } from '@/lib/types';
 
+export async function DELETE(request: NextRequest): Promise<NextResponse<{ success: boolean } | { error: string }>> {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from('businesses')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('[Businesses] Delete error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[Businesses] Delete error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error occurred' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse<BusinessesResponse | { error: string }>> {
   try {
     const { searchParams } = new URL(request.url);
@@ -12,6 +42,11 @@ export async function GET(request: NextRequest): Promise<NextResponse<Businesses
     const sortBy = searchParams.get('sort_by') || 'created_at';
     const sortOrder = searchParams.get('sort_order') || 'desc';
     const nameFilter = searchParams.get('name') || '';
+
+    // New filter params
+    const hasReviews20 = searchParams.get('has_reviews_20') === 'true';
+    const hasPhone = searchParams.get('has_phone') === 'true';
+    const hasWebsite = searchParams.get('has_website') === 'true';
 
     const offset = (page - 1) * limit;
 
@@ -28,6 +63,19 @@ export async function GET(request: NextRequest): Promise<NextResponse<Businesses
 
     if (nameFilter) {
       query = query.ilike('name', `%${nameFilter}%`);
+    }
+
+    // Apply new toggle filters
+    if (hasReviews20) {
+      query = query.gt('review_count', 20);
+    }
+
+    if (hasPhone) {
+      query = query.not('phone', 'is', null);
+    }
+
+    if (hasWebsite) {
+      query = query.is('website', null);
     }
 
     // Apply sorting
