@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import nodemailer from 'nodemailer';
 
-const DELAY_MS = 8000;
+const DELAY_MS = 15000;
 
 function getEmailHtml(businessName: string): string {
   return `<!DOCTYPE html>
@@ -216,7 +216,6 @@ export async function POST(request: NextRequest) {
           from: '"iProPixel Solutions" <info@ipropixel.com>',
           replyTo: 'info@ipropixel.com',
           to: email,
-          bcc: smtpUser,
           subject: 'Ofertë promocionale për përmirësimin ose krijimin e faqes web',
           text: getPlainText(biz.name),
           html: getEmailHtml(biz.name),
