@@ -45,6 +45,7 @@ interface ScrapeRequestBody {
   selectedNeighborhoods?: number[];
   skipDuplicates: boolean;
   scrapeId?: string;
+  apifyApiKey?: string;
 }
 
 type LogType = "info" | "success" | "error" | "item-new" | "item-update" | "item-skip";
@@ -309,6 +310,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
       selectedNeighborhoods = [],
       skipDuplicates,
       scrapeId,
+      apifyApiKey,
     } = body;
 
     const { log, cleanup } = await createLogger(scrapeId);
@@ -328,15 +330,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
       );
     }
 
-    if (!APIFY_API_KEY) {
+    const resolvedApifyKey = apifyApiKey || APIFY_API_KEY;
+
+    if (!resolvedApifyKey) {
       return NextResponse.json(
         {
           success: false,
-          message: "APIFY_API_KEY is not configured",
+          message: "Apify API key is required. Enter it in the UI or set APIFY_API_KEY env var.",
           stats: { scraped: 0, inserted: 0, updated: 0, duplicates: 0, failed: 0 },
           sample: [],
         },
-        { status: 500 },
+        { status: 400 },
       );
     }
 
@@ -384,7 +388,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
 
     // Initialize Apify client
     const client = new ApifyClient({
-      token: APIFY_API_KEY,
+      token: resolvedApifyKey,
     });
 
     // Prepare Apify actor input with all Finding options enabled

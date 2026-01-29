@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MapPin, LayoutDashboard, Search, Mail } from "lucide-react";
+import { MapPin, LayoutDashboard, Search, Mail, Phone } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -11,6 +11,7 @@ export function Navbar() {
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/finder", label: "Finder", icon: Search },
     { href: "/email", label: "Email", icon: Mail },
+    { href: "/phone", label: "Phone", icon: Phone },
   ];
 
   return (

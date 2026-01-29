@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import {
-  Mail,
+  Phone,
   Send,
   CheckCircle,
   Loader2,
@@ -34,23 +34,23 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-interface EmailBusiness {
+interface PhoneBusiness {
   id: string;
   name: string;
   phone: string | null;
   website: string | null;
   emails: string[];
   category_name: string | null;
-  email_sent: boolean;
-  email_sent_at: string | null;
+  sms_sent: boolean;
+  sms_sent_at: string | null;
 }
 
 type FilterTab = "not_sent" | "sent" | "all";
 
 const PAGE_SIZE = 500;
 
-export function EmailSender() {
-  const [businesses, setBusinesses] = useState<EmailBusiness[]>([]);
+export function PhoneSender() {
+  const [businesses, setBusinesses] = useState<PhoneBusiness[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<FilterTab>("not_sent");
   const [noWebsite, setNoWebsite] = useState(false);
@@ -65,7 +65,7 @@ export function EmailSender() {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/businesses/email-list?filter=${filter}&page=${page}&limit=${PAGE_SIZE}&noWebsite=${noWebsite}`
+        `/api/businesses/phone-list?filter=${filter}&page=${page}&limit=${PAGE_SIZE}&noWebsite=${noWebsite}`
       );
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -116,7 +116,7 @@ export function EmailSender() {
     setProgress({ sent: 0, total: ids.length });
 
     try {
-      const res = await fetch("/api/send-emails", {
+      const res = await fetch("/api/send-sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ businessIds: ids }),
@@ -125,14 +125,14 @@ export function EmailSender() {
       const result = await res.json();
 
       if (result.error) {
-        toast.error(`Email error: ${result.error}`);
+        toast.error(`SMS error: ${result.error}`);
       } else {
         setProgress({ sent: result.sent, total: ids.length });
         if (result.sent > 0) {
-          toast.success(`Successfully sent ${result.sent} emails`);
+          toast.success(`Successfully sent ${result.sent} messages`);
         }
         if (result.failed > 0) {
-          toast.error(`Failed to send ${result.failed} emails`);
+          toast.error(`Failed to send ${result.failed} messages`);
         }
         await fetchBusinesses();
       }
@@ -156,8 +156,8 @@ export function EmailSender() {
       {/* Header with stats */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Mail className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Email Management</h2>
+          <Phone className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Phone / SMS Management</h2>
           <Badge variant="secondary">{total} businesses</Badge>
         </div>
 
@@ -171,18 +171,18 @@ export function EmailSender() {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Confirm Email Send</AlertDialogTitle>
+                <AlertDialogTitle>Confirm SMS Send</AlertDialogTitle>
                 <AlertDialogDescription>
-                  You are about to send promotional emails to{" "}
-                  <strong>{selected.size}</strong> businesses. Emails will be
-                  sent with 8-second delays between each. This action cannot be
+                  You are about to send SMS messages to{" "}
+                  <strong>{selected.size}</strong> businesses. Messages will be
+                  sent with 5-second delays between each. This action cannot be
                   undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleSend}>
-                  Send Emails
+                  Send Messages
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -198,11 +198,10 @@ export function EmailSender() {
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
               <div>
                 <p className="font-medium">
-                  Sending emails... {progress.sent}/{progress.total}
+                  Sending messages... {progress.sent}/{progress.total}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Please wait. Emails are sent with 8-second intervals to avoid
-                  spam filters.
+                  Please wait. Messages are sent with 5-second intervals.
                 </p>
               </div>
             </div>
@@ -248,7 +247,7 @@ export function EmailSender() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
-            Businesses with Email Addresses
+            Businesses with Phone Numbers
           </CardTitle>
         </CardHeader>
         <CardContent className="px-0">
@@ -302,10 +301,17 @@ export function EmailSender() {
                         </TableCell>
                         <TableCell className="text-muted-foreground max-w-[200px] truncate">
                           {biz.website ? (
-                            <a href={biz.website} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                              {biz.website.replace(/^https?:\/\/(www\.)?/, '')}
+                            <a
+                              href={biz.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                            >
+                              {biz.website.replace(/^https?:\/\/(www\.)?/, "")}
                             </a>
-                          ) : "\u2014"}
+                          ) : (
+                            "\u2014"
+                          )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {biz.emails?.[0] || "\u2014"}
@@ -317,12 +323,12 @@ export function EmailSender() {
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground">
-                              \u2014
+                              {"\u2014"}
                             </span>
                           )}
                         </TableCell>
                         <TableCell>
-                          {biz.email_sent ? (
+                          {biz.sms_sent ? (
                             <div className="flex items-center gap-1.5 text-green-600">
                               <CheckCircle className="h-4 w-4" />
                               <span className="text-sm">Sent</span>

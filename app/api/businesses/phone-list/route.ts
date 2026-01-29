@@ -13,14 +13,14 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('businesses')
-      .select('id, name, phone, website, emails, category_name, email_sent, email_sent_at', { count: 'exact' })
-      .not('emails', 'is', null)
-      .neq('emails', '[]');
+      .select('id, name, phone, website, emails, category_name, sms_sent, sms_sent_at', { count: 'exact' })
+      .not('phone', 'is', null)
+      .neq('phone', '');
 
     if (filter === 'sent') {
-      query = query.eq('email_sent', true);
+      query = query.eq('sms_sent', true);
     } else if (filter === 'not_sent') {
-      query = query.or('email_sent.eq.false,email_sent.is.null');
+      query = query.or('sms_sent.eq.false,sms_sent.is.null');
     }
 
     const noWebsite = searchParams.get('noWebsite');
@@ -33,21 +33,16 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query;
 
     if (error) {
-      console.error('[EmailList] Query error:', error);
+      console.error('[PhoneList] Query error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
-    // Extra client-side filter: only businesses where emails array has at least one non-empty string
-    const filtered = (data || []).filter(
-      (b) => Array.isArray(b.emails) && b.emails.length > 0 && b.emails.some((e: string) => e && e.trim() !== '')
-    );
 
     const total = count || 0;
     const totalPages = Math.ceil(total / limit);
 
-    return NextResponse.json({ data: filtered, total, page, totalPages });
+    return NextResponse.json({ data: data || [], total, page, totalPages });
   } catch (error) {
-    console.error('[EmailList] Error:', error);
+    console.error('[PhoneList] Error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

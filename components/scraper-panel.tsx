@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { ScrapeResponse } from "@/lib/types";
-import { Search, Loader2, CheckCircle, XCircle, AlertCircle, MapPin, Map, Terminal, Trash2 } from "lucide-react";
+import { Search, Loader2, CheckCircle, XCircle, AlertCircle, MapPin, Map, Terminal, Trash2, Key } from "lucide-react";
 import { toast } from "sonner";
 import { getSupabase } from "@/lib/supabase";
 
@@ -72,6 +72,7 @@ const TIRANA_NEIGHBORHOODS = [
 ];
 
 export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
+  const [apifyApiKey, setApifyApiKey] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [city, setCity] = useState("Tirana, Albania");
   const [useNeighborhoods, setUseNeighborhoods] = useState(false);
@@ -169,6 +170,7 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
           maxResults: limit[0],
           skipDuplicates,
           scrapeId,
+          apifyApiKey: apifyApiKey.trim() || undefined,
         }),
       });
 
@@ -208,6 +210,23 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
         <CardDescription>Find businesses in Albania</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        {/* Apify API Key */}
+        <div className="space-y-2">
+          <Label htmlFor="apify-key">Apify API Key</Label>
+          <div className="relative">
+            <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="apify-key"
+              type="password"
+              placeholder="Enter your Apify API key..."
+              value={apifyApiKey}
+              onChange={(e) => setApifyApiKey(e.target.value)}
+              disabled={isLoading}
+              className="pl-9"
+            />
+          </div>
+        </div>
+
         {/* Search Query */}
         <div className="space-y-2">
           <Label htmlFor="search-query">Business Type</Label>
@@ -335,7 +354,7 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
         {/* Scrape Button */}
         <Button
           onClick={handleScrape}
-          disabled={isLoading || !searchQuery.trim() || (useNeighborhoods && selectedNeighborhoods.length === 0)}
+          disabled={isLoading || !apifyApiKey.trim() || !searchQuery.trim() || (useNeighborhoods && selectedNeighborhoods.length === 0)}
           className="w-full"
           size="lg"
         >
