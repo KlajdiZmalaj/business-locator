@@ -45,7 +45,7 @@ interface EmailBusiness {
 
 type FilterTab = "not_sent" | "sent" | "all";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 500;
 
 export function EmailSender() {
   const [businesses, setBusinesses] = useState<EmailBusiness[]>([]);
