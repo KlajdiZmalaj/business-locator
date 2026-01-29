@@ -48,7 +48,9 @@ import {
   AlertCircle,
   Filter,
   Trash2,
+  Download,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 interface BusinessesListProps {
   refreshTrigger: number;
@@ -67,6 +69,7 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [sortBy, setSortBy] = useState("created_at");
@@ -109,7 +112,7 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
     try {
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: "10",
+        limit: perPage.toString(),
         sort_by: sortBy,
         sort_order: sortOrder,
       });
@@ -141,7 +144,7 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
     } finally {
       setIsLoading(false);
     }
-  }, [page, sortBy, sortOrder, debouncedFilters, onBusinessesLoaded]);
+  }, [page, perPage, sortBy, sortOrder, debouncedFilters, onBusinessesLoaded]);
 
   useEffect(() => {
     fetchBusinesses();
@@ -218,6 +221,55 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
     } finally {
       setDeleteConfirm(null);
     }
+  };
+
+  const exportToExcel = () => {
+    const rows = businesses.map((b) => ({
+      Name: b.name,
+      "Category": b.category_name || "",
+      "All Categories": b.categories?.join(", ") || "",
+      Phone: b.phone || "",
+      "Phone (Unformatted)": b.phone_unformatted || "",
+      "All Phones": b.phones?.join(", ") || "",
+      Rating: b.rating ?? "",
+      "Review Count": b.review_count ?? 0,
+      Address: b.address || "",
+      Street: b.street || "",
+      City: b.city || "",
+      Neighborhood: b.neighborhood || "",
+      "Postal Code": b.postal_code || "",
+      State: b.state || "",
+      "Country Code": b.country_code || "",
+      Latitude: b.latitude ?? "",
+      Longitude: b.longitude ?? "",
+      Website: b.website || "",
+      Domain: b.domain || "",
+      Emails: b.emails?.join(", ") || "",
+      "Google Maps URL": b.maps_url || "",
+      Price: b.price || "",
+      "Hotel Stars": b.hotel_stars || "",
+      "Images Count": b.images_count ?? "",
+      "Image URL": b.image_url || "",
+      Instagram: b.instagram || "",
+      Facebook: b.facebook || "",
+      Twitter: b.twitter || "",
+      YouTube: b.youtube || "",
+      TikTok: b.tiktok || "",
+      LinkedIn: b.linkedin || "",
+      WhatsApp: b.whatsapp || "",
+      "Permanently Closed": b.permanently_closed ? "Yes" : "No",
+      "Temporarily Closed": b.temporarily_closed ? "Yes" : "No",
+      "Place ID": b.place_id || "",
+      CID: b.cid || "",
+      "Opening Hours": b.opening_hours?.map((h) => `${h.day}: ${h.hours}`).join("; ") || "",
+      "Search Query": b.search_query || "",
+      "Scraped At": b.scraped_at || "",
+      "Created At": b.created_at || "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Businesses");
+    XLSX.writeFile(wb, `businesses-page-${page}.xlsx`);
   };
 
   const renderStars = (rating: number | null) => {
@@ -308,23 +360,34 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
             </CardTitle>
             <CardDescription>{total} total businesses found</CardDescription>
           </div>
-          <Select
-            value={sortBy}
-            onValueChange={(value) => {
-              setSortBy(value);
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="created_at">Date Added</SelectItem>
-              <SelectItem value="rating">Rating</SelectItem>
-              <SelectItem value="review_count">Reviews</SelectItem>
-              <SelectItem value="name">Name</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToExcel}
+              disabled={businesses.length === 0}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Export
+            </Button>
+            <Select
+              value={sortBy}
+              onValueChange={(value) => {
+                setSortBy(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_at">Date Added</SelectItem>
+                <SelectItem value="rating">Rating</SelectItem>
+                <SelectItem value="review_count">Reviews</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Filter Toolbar */}
@@ -704,27 +767,72 @@ export function BusinessesList({ refreshTrigger, onBusinessesLoaded }: Businesse
 
             {/* Pagination */}
             <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Page {page} of {totalPages}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Rows per page</span>
+                  <Select
+                    value={perPage.toString()}
+                    onValueChange={(value) => {
+                      setPerPage(Number(value));
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[70px] h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {(page - 1) * perPage + 1}-{Math.min(page * perPage, total)} of {total}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage(1)}
+                  disabled={page <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-4 w-4 -ml-2" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  Previous
                 </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                  Page {page} of {totalPages}
+                </span>
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="icon"
+                  className="h-8 w-8"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
                 >
-                  Next
                   <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage(totalPages)}
+                  disabled={page >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-4 w-4 -ml-2" />
                 </Button>
               </div>
             </div>

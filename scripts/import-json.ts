@@ -59,28 +59,30 @@ interface ApifyRecord {
 }
 
 async function importData() {
-  const filePath = path.join(process.cwd(), "dataset_crawler-google-places_2026-01-27_23-54-46-964.json");
+  const fileArg = process.argv[2];
+  if (!fileArg) {
+    console.error("Usage: npx tsx scripts/import-json.ts <json-file>");
+    process.exit(1);
+  }
+  const filePath = path.isAbsolute(fileArg) ? fileArg : path.join(process.cwd(), fileArg);
   const rawData = fs.readFileSync(filePath, "utf-8");
   const records: ApifyRecord[] = JSON.parse(rawData);
 
   console.log(`Found ${records.length} records to import`);
 
-  // Load existing phones to avoid duplicates
-  const { data: existing } = await supabase.from("businesses").select("name, phone");
+  // Load existing names to avoid duplicates
+  const { data: existing } = await supabase.from("businesses").select("name");
   const existingNames = new Set<string>();
-  const existingPhones = new Set<string>();
 
   if (existing) {
     for (const b of existing) {
       if (b.name) existingNames.add(b.name.toLowerCase());
-      if (b.phone) existingPhones.add(b.phone);
     }
   }
-  console.log(`Loaded ${existingNames.size} existing names, ${existingPhones.size} existing phones`);
+  console.log(`Loaded ${existingNames.size} existing names`);
 
   const now = new Date().toISOString();
   const toInsert = [];
-  const processedPhones = new Set<string>();
   let skipped = 0;
 
   for (const record of records) {
@@ -94,13 +96,6 @@ async function importData() {
     // Skip if name already exists
     if (existingNames.has(nameLower)) {
       console.log(`[SKIP] ${record.title} (name exists)`);
-      skipped++;
-      continue;
-    }
-
-    // Skip if phone already exists
-    if (record.phone && (existingPhones.has(record.phone) || processedPhones.has(record.phone))) {
-      console.log(`[SKIP] ${record.title} (phone ${record.phone} exists)`);
       skipped++;
       continue;
     }
@@ -149,20 +144,38 @@ async function importData() {
     };
 
     toInsert.push(businessRecord);
-    if (record.phone) processedPhones.add(record.phone);
     console.log(`[ADD] ${record.title}`);
   }
 
   console.log(`\nInserting ${toInsert.length} records (skipped ${skipped})...`);
 
   if (toInsert.length > 0) {
-    const { data, error } = await supabase.from("businesses").insert(toInsert);
+    const chunkSize = 500;
+    let inserted = 0;
+    let failed = 0;
 
-    if (error) {
-      console.error("Insert error:", error.message);
-    } else {
-      console.log(`Successfully inserted ${toInsert.length} records!`);
+    for (let i = 0; i < toInsert.length; i += chunkSize) {
+      const chunk = toInsert.slice(i, i + chunkSize);
+      const { error } = await supabase.from("businesses").insert(chunk);
+
+      if (error) {
+        console.log(`Chunk ${Math.floor(i / chunkSize) + 1} failed: ${error.message}. Retrying row-by-row...`);
+        for (const row of chunk) {
+          const { error: rowError } = await supabase.from("businesses").insert(row);
+          if (rowError) {
+            failed++;
+            console.log(`  [FAIL] ${row.name} -- ${rowError.message}`);
+          } else {
+            inserted++;
+          }
+        }
+      } else {
+        inserted += chunk.length;
+        console.log(`Chunk ${Math.floor(i / chunkSize) + 1}: inserted ${chunk.length} records`);
+      }
     }
+
+    console.log(`\nDone! Inserted: ${inserted}, Failed: ${failed}`);
   }
 }
 

@@ -57,6 +57,10 @@ export interface Business {
   domain: string | null;
   opening_hours: { day: string; hours: string }[];
   additional_info: Record<string, unknown>;
+
+  // Email tracking
+  email_sent: boolean;
+  email_sent_at: string | null;
 }
 
 export interface ScrapeRequest {

@@ -44,6 +44,56 @@ interface ScrapeRequestBody {
   useNeighborhoods?: boolean;
   selectedNeighborhoods?: number[];
   skipDuplicates: boolean;
+  scrapeId?: string;
+}
+
+type LogType = "info" | "success" | "error" | "item-new" | "item-update" | "item-skip";
+
+async function createLogger(scrapeId?: string) {
+  let channel: ReturnType<ReturnType<typeof getSupabaseAdmin>["channel"]> | null = null;
+  let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+
+  if (scrapeId) {
+    channel = getSupabaseAdmin().channel(`scrape-logs-${scrapeId}`);
+    // Subscribe and wait for the channel to be joined so send() uses WebSocket
+    await new Promise<void>((resolve) => {
+      channel!.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          resolve();
+        }
+      });
+    });
+    // Keep the WebSocket alive during long waits (e.g. Apify actor runs)
+    heartbeatInterval = setInterval(() => {
+      channel!.send({
+        type: "broadcast",
+        event: "heartbeat",
+        payload: {},
+      });
+    }, 20_000);
+  }
+
+  const log = (message: string, type: LogType = "info") => {
+    console.log(message);
+    if (channel) {
+      channel.send({
+        type: "broadcast",
+        event: "log",
+        payload: { message, type, timestamp: new Date().toISOString() },
+      });
+    }
+  };
+
+  const cleanup = () => {
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+    }
+    if (channel) {
+      getSupabaseAdmin().removeChannel(channel);
+    }
+  };
+
+  return { log, cleanup };
 }
 
 interface ScrapeStats {
@@ -246,6 +296,7 @@ function createInsertRecord(business: ScrapedBusiness, searchQuery: string, now:
 
 export async function POST(request: NextRequest): Promise<NextResponse<ScrapeResponse>> {
   const startTime = Date.now();
+  let loggerCleanup: (() => void) | undefined;
 
   try {
     const body: ScrapeRequestBody = await request.json();
@@ -257,7 +308,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
       useNeighborhoods = false,
       selectedNeighborhoods = [],
       skipDuplicates,
+      scrapeId,
     } = body;
+
+    const { log, cleanup } = await createLogger(scrapeId);
+    loggerCleanup = cleanup;
 
     const maxPlaces = maxResults || limit || 100;
 
@@ -299,36 +354,32 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
       searchStringsArray = [searchQuery];
     }
 
-    console.log(`\n${"=".repeat(70)}`);
-    console.log(`[SCRAPE START] "${searchQuery}" in ${city}`);
-    console.log(`[CONFIG] Max results: ${maxPlaces} | Skip duplicates: ${skipDuplicates}`);
-    console.log(`[CONFIG] Neighborhoods: ${useNeighborhoods ? selectedNeighborhoods.length : "city-wide"}`);
-    console.log(`${"=".repeat(70)}`);
+    log(`${"=".repeat(70)}`);
+    log(`[SCRAPE START] "${searchQuery}" in ${city}`);
+    log(`[CONFIG] Max results: ${maxPlaces} | Skip duplicates: ${skipDuplicates}`);
+    log(`[CONFIG] Neighborhoods: ${useNeighborhoods ? selectedNeighborhoods.length : "city-wide"}`);
+    log(`${"=".repeat(70)}`);
 
     const stats: ScrapeStats = { scraped: 0, inserted: 0, updated: 0, duplicates: 0, failed: 0 };
     const sample: Partial<ScrapedBusiness>[] = [];
 
     // Load existing businesses as Map<nameLowercase, {id, phone}> for O(1) lookups
     const existingBusinesses = new Map<string, ExistingBusiness>();
-    // Track existing phone numbers to avoid unique constraint violation
-    const existingPhones = new Set<string>();
 
-    // Always load existing phones to avoid unique constraint violations
-    console.log(`[DB] Loading existing businesses...`);
-    const { data: existing, error } = await getSupabaseAdmin().from("businesses").select("id, name, phone");
+    if (skipDuplicates) {
+      log(`[DB] Loading existing businesses...`);
+      const { data: existing, error } = await getSupabaseAdmin().from("businesses").select("id, name, phone");
 
-    if (error) {
-      console.error(`[DB] Error loading existing:`, error.message);
-    } else if (existing) {
-      for (const b of existing) {
-        if (skipDuplicates && b.name) {
-          existingBusinesses.set(b.name.toLowerCase(), { id: b.id, phone: b.phone });
+      if (error) {
+        log(`[DB] Error loading existing: ${error.message}`, "error");
+      } else if (existing) {
+        for (const b of existing) {
+          if (b.name) {
+            existingBusinesses.set(b.name.toLowerCase(), { id: b.id, phone: b.phone });
+          }
         }
-        if (b.phone) {
-          existingPhones.add(b.phone);
-        }
+        log(`[DB] Loaded ${existing.length} existing businesses`);
       }
-      console.log(`[DB] Loaded ${existing.length} existing businesses, ${existingPhones.size} unique phones`);
     }
 
     // Initialize Apify client
@@ -362,24 +413,48 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
       skipClosedPlaces: false,
     };
 
-    console.log(`[APIFY] Starting Google Maps Scraper actor...`);
-    console.log(`[APIFY] Search queries:`, searchStringsArray);
+    log(` Starting Google Maps Scraper actor...`);
+    log(` Search queries: ${searchStringsArray.join(", ")}`);
 
-    // Run the Actor and wait for it to finish
-    const run = await client.actor(GOOGLE_MAPS_SCRAPER_ACTOR).call(input);
+    // Start the Actor (non-blocking) so we can stream its logs
+    const run = await client.actor(GOOGLE_MAPS_SCRAPER_ACTOR).start(input);
+    log(` Run started (${run.id}). Streaming logs...`);
 
-    console.log(`[APIFY] Actor run completed. Fetching results...`);
+    // Stream Apify actor logs to the client in real-time
+    const logStream = await client.run(run.id).log().stream();
+    if (logStream) {
+      let partial = "";
+      logStream.on("data", (chunk: Buffer) => {
+        partial += chunk.toString();
+        const lines = partial.split("\n");
+        // Keep the last incomplete line for next chunk
+        partial = lines.pop()!;
+        for (const line of lines) {
+          if (line.trim()) {
+            log(`[ACTOR] ${line}`, "info");
+          }
+        }
+      });
+    }
+
+    // Wait for the run to finish
+    const finishedRun = await client.run(run.id).waitForFinish();
+
+    if (finishedRun.status !== "SUCCEEDED") {
+      log(` Actor run ended with status: ${finishedRun.status}`, "error");
+    }
+
+    log(` Actor run completed. Fetching results...`);
 
     // Fetch results from the run's dataset
     const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
-    console.log(`[APIFY] Found ${items.length} places`);
+    log(` Found ${items.length} places`, "success");
 
     // Prepare batches for insert and update
     const toInsert: BusinessToInsert[] = [];
     const toUpdate: BusinessToUpdate[] = [];
     const processedNames = new Set<string>();
-    const processedPhones = new Set<string>(); // Track phones in current batch
 
     const now = new Date().toISOString();
 
@@ -402,30 +477,24 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
       // Skip if we already processed this name in current batch
       if (processedNames.has(nameLower)) {
         stats.duplicates++;
-        console.log(`    [=] ${business.name} (duplicate in batch)`);
+        log(`    [=] ${business.name} (duplicate in batch)`, "item-skip");
         continue;
       }
 
       if (skipDuplicates) {
         const existing = existingBusinesses.get(nameLower);
 
-        // Check if phone already exists in DB or current batch
-        const phoneExists =
-          business.phone && (existingPhones.has(business.phone) || processedPhones.has(business.phone));
-
         if (existing) {
           if (existing.phone) {
             stats.duplicates++;
-            console.log(`    [=] ${business.name} (has phone)`);
-          } else if (business.phone && !phoneExists) {
-            // Only update if phone doesn't already exist elsewhere
+            log(`    [=] ${business.name} (exists)`, "item-skip");
+          } else if (business.phone) {
             toUpdate.push({
               id: existing.id,
               phone: business.phone,
               phone_unformatted: business.phone_unformatted,
             });
-            processedPhones.add(business.phone);
-            console.log(`    [~] ${business.name} (will update phone: ${business.phone})`);
+            log(`    [~] ${business.name} (will update phone: ${business.phone})`, "item-update");
             if (sample.length < 5) {
               sample.push({
                 name: business.name,
@@ -436,44 +505,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
             }
           } else {
             stats.duplicates++;
-            console.log(`    [=] ${business.name} (no phone to add or phone exists)`);
+            log(`    [=] ${business.name} (exists, no new phone)`, "item-skip");
           }
-        } else {
-          // Check if phone would cause a duplicate
-          if (phoneExists) {
-            stats.duplicates++;
-            console.log(`    [=] ${business.name} (phone ${business.phone} already exists)`);
-          } else {
-            toInsert.push(createInsertRecord(business, searchQuery, now));
-            if (business.phone) {
-              processedPhones.add(business.phone);
-            }
-            console.log(
-              `    [+] ${business.name} | ${business.category_name || "-"} | Phone: ${business.phone || "-"}`,
-            );
-            if (sample.length < 5) {
-              sample.push({
-                name: business.name,
-                phone: business.phone,
-                rating: business.rating,
-                category_name: business.category_name,
-              });
-            }
-          }
-        }
-      } else {
-        // Even without skipDuplicates, we need to avoid phone constraint violations
-        const phoneExists =
-          business.phone && (existingPhones.has(business.phone) || processedPhones.has(business.phone));
-        if (phoneExists) {
-          stats.duplicates++;
-          console.log(`    [=] ${business.name} (phone ${business.phone} already exists)`);
         } else {
           toInsert.push(createInsertRecord(business, searchQuery, now));
-          if (business.phone) {
-            processedPhones.add(business.phone);
-          }
-          console.log(`    [+] ${business.name} | ${business.category_name || "-"} | Phone: ${business.phone || "-"}`);
+          log(
+            `    [+] ${business.name} | ${business.category_name || "-"} | Phone: ${business.phone || "-"}`,
+            "item-new",
+          );
           if (sample.length < 5) {
             sample.push({
               name: business.name,
@@ -482,6 +521,20 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
               category_name: business.category_name,
             });
           }
+        }
+      } else {
+        toInsert.push(createInsertRecord(business, searchQuery, now));
+        log(
+          `    [+] ${business.name} | ${business.category_name || "-"} | Phone: ${business.phone || "-"}`,
+          "item-new",
+        );
+        if (sample.length < 5) {
+          sample.push({
+            name: business.name,
+            phone: business.phone,
+            rating: business.rating,
+            category_name: business.category_name,
+          });
         }
       }
 
@@ -492,7 +545,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
 
     // Batch insert new businesses (in chunks of 500 for Supabase limits)
     if (toInsert.length > 0) {
-      console.log(`\n[DB] Inserting ${toInsert.length} new businesses...`);
+      log(`[DB] Inserting ${toInsert.length} new businesses...`);
       const chunkSize = 500;
 
       for (let i = 0; i < toInsert.length; i += chunkSize) {
@@ -500,18 +553,28 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
         const { error } = await supabase.from("businesses").insert(chunk);
 
         if (error) {
-          console.error(`[DB] Insert error (chunk ${i / chunkSize + 1}):`, error.message);
-          stats.failed += chunk.length;
+          log(`[DB] Chunk ${i / chunkSize + 1} failed: ${error.message}. Retrying row-by-row...`, "error");
+          // Retry individually so one bad row doesn't kill the whole chunk
+          for (const row of chunk) {
+            const { error: rowError } = await supabase.from("businesses").insert(row);
+            if (rowError) {
+              stats.failed++;
+              log(`    [!] Failed: ${row.name} -- ${rowError.message}`, "error");
+            } else {
+              stats.inserted++;
+            }
+          }
+          log(`[DB] Chunk ${i / chunkSize + 1} row-by-row done`, "info");
         } else {
           stats.inserted += chunk.length;
-          console.log(`[DB] Inserted chunk ${Math.floor(i / chunkSize) + 1}: ${chunk.length} records`);
+          log(`[DB] Inserted chunk ${Math.floor(i / chunkSize) + 1}: ${chunk.length} records`, "success");
         }
       }
     }
 
     // Batch update existing businesses with new phone numbers
     if (toUpdate.length > 0) {
-      console.log(`\n[DB] Updating ${toUpdate.length} businesses with phone numbers...`);
+      log(`[DB] Updating ${toUpdate.length} businesses with phone numbers...`);
 
       for (const update of toUpdate) {
         const { error } = await supabase
@@ -524,22 +587,25 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
           .eq("id", update.id);
 
         if (error) {
-          console.error(`[DB] Update error for ${update.id}:`, error.message);
+          log(`[DB] Update error for ${update.id}: ${error.message}`, "error");
           stats.failed++;
         } else {
           stats.updated++;
         }
       }
-      console.log(`[DB] Updated ${stats.updated} records with phone numbers`);
+      log(`[DB] Updated ${stats.updated} records with phone numbers`, "success");
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`\n${"=".repeat(70)}`);
-    console.log(`[SCRAPE COMPLETE] Duration: ${duration}s`);
-    console.log(
+    log(`${"=".repeat(70)}`);
+    log(`[SCRAPE COMPLETE] Duration: ${duration}s`, "success");
+    log(
       `[RESULTS] Scraped: ${stats.scraped} | Inserted: ${stats.inserted} | Updated: ${stats.updated} | Duplicates: ${stats.duplicates} | Failed: ${stats.failed}`,
+      "success",
     );
-    console.log(`${"=".repeat(70)}\n`);
+    log(`${"=".repeat(70)}`);
+
+    cleanup();
 
     return NextResponse.json({
       success: true,
@@ -549,6 +615,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScrapeRes
     });
   } catch (error) {
     console.error("[FATAL ERROR]", error);
+    loggerCleanup?.();
     return NextResponse.json(
       {
         success: false,

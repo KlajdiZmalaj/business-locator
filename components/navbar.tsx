@@ -1,31 +1,44 @@
 "use client";
 
-import { MapPin, Database } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { MapPin, LayoutDashboard, Search, Mail } from "lucide-react";
 
-interface NavbarProps {
-  lastScrapeTime: string | null;
-}
+export function Navbar() {
+  const pathname = usePathname();
 
-export function Navbar({ lastScrapeTime }: NavbarProps) {
+  const links = [
+    { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/finder", label: "Finder", icon: Search },
+    { href: "/email", label: "Email", icon: Mail },
+  ];
+
   return (
     <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">Business Locator</span>
-          </div>
-
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Database className="h-4 w-4" />
-            </div>
+            <Link href="/" className="flex items-center gap-2">
+              <MapPin className="h-6 w-6 text-primary" />
+              <span className="text-xl font-bold">Business Locator</span>
+            </Link>
 
-            {lastScrapeTime && (
-              <div className="text-sm text-muted-foreground">
-                Last scrape: {new Date(lastScrapeTime).toLocaleString()}
-              </div>
-            )}
+            <div className="flex items-center gap-1">
+              {links.map(({ href, label, icon: Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                    pathname === href
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </div>

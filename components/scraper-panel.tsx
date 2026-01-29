@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { ScrapeResponse } from "@/lib/types";
-import { Search, Loader2, CheckCircle, XCircle, AlertCircle, MapPin, Map } from "lucide-react";
+import { Search, Loader2, CheckCircle, XCircle, AlertCircle, MapPin, Map, Terminal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { getSupabase } from "@/lib/supabase";
+
+interface LogEntry {
+  message: string;
+  type: string;
+  timestamp: string;
+}
 
 interface ScraperPanelProps {
   onScrapeComplete: () => void;
@@ -73,6 +80,52 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ScrapeResponse | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<ReturnType<ReturnType<typeof getSupabase>["channel"]> | null>(null);
+
+  // Auto-scroll logs to bottom
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
+  // Cleanup channel on unmount
+  useEffect(() => {
+    return () => {
+      if (channelRef.current) {
+        getSupabase().removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, []);
+
+  const subscribeToLogs = useCallback((scrapeId: string) => {
+    const supabase = getSupabase();
+    const channel = supabase.channel(`scrape-logs-${scrapeId}`);
+
+    const ready = new Promise<void>((resolve) => {
+      channel
+        .on("broadcast", { event: "log" }, (payload) => {
+          const entry = payload.payload as LogEntry;
+          setLogs((prev) => [...prev, entry]);
+        })
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            resolve();
+          }
+        });
+    });
+
+    channelRef.current = channel;
+    return ready;
+  }, []);
+
+  const unsubscribeFromLogs = useCallback(() => {
+    if (channelRef.current) {
+      getSupabase().removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+  }, []);
 
   const toggleNeighborhood = (index: number) => {
     setSelectedNeighborhoods((prev) => (prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]));
@@ -99,6 +152,10 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
 
     setIsLoading(true);
     setResult(null);
+    setLogs([]);
+
+    const scrapeId = crypto.randomUUID();
+    await subscribeToLogs(scrapeId);
 
     try {
       const response = await fetch("/api/scrape-businesses", {
@@ -111,6 +168,7 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
           selectedNeighborhoods,
           maxResults: limit[0],
           skipDuplicates,
+          scrapeId,
         }),
       });
 
@@ -133,6 +191,7 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
       });
     } finally {
       setIsLoading(false);
+      unsubscribeFromLogs();
     }
   };
 
@@ -144,9 +203,9 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Search className="h-5 w-5" />
-          Scraper
+          Finder
         </CardTitle>
-        <CardDescription>Scrape businesses from Google Maps via Apify</CardDescription>
+        <CardDescription>Find businesses in Albania</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Search Query */}
@@ -283,7 +342,7 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Finding... (check console for progress)
+              Finding...
             </>
           ) : (
             <>
@@ -292,6 +351,55 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
             </>
           )}
         </Button>
+
+        {/* Live Logs */}
+        {(isLoading || logs.length > 0) && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Terminal className="h-3.5 w-3.5" />
+                Live Logs
+                {isLoading && <span className="animate-pulse ml-1">...</span>}
+              </div>
+              {!isLoading && logs.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setLogs([])}
+                  className="h-6 text-xs px-2 text-muted-foreground"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Clear
+                </Button>
+              )}
+            </div>
+            <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-3 max-h-64 overflow-y-auto font-mono text-xs leading-relaxed">
+              {logs.map((entry, i) => (
+                <div
+                  key={i}
+                  className={
+                    entry.type === "item-new"
+                      ? "text-green-400"
+                      : entry.type === "item-update"
+                        ? "text-blue-400"
+                        : entry.type === "item-skip"
+                          ? "text-zinc-500"
+                          : entry.type === "error"
+                            ? "text-red-400"
+                            : entry.type === "success"
+                              ? "text-emerald-400"
+                              : "text-zinc-300"
+                  }
+                >
+                  <span className="text-zinc-600 mr-2">{new Date(entry.timestamp).toLocaleTimeString()}</span>
+                  {entry.message}
+                </div>
+              ))}
+              {logs.length === 0 && isLoading && <div className="text-zinc-500">Waiting for logs...</div>}
+              <div ref={logsEndRef} />
+            </div>
+          </div>
+        )}
 
         {/* Results */}
         {result && (
