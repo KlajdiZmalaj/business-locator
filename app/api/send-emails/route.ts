@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer';
 
 const DELAY_MS = 8000;
 
-function getEmailHtml(): string {
+function getEmailHtml(businessName: string): string {
   return `<!DOCTYPE html>
 <html lang="sq">
 <head>
@@ -28,7 +28,7 @@ function getEmailHtml(): string {
           <!-- Body -->
           <tr>
             <td style="padding:40px;">
-              <h2 style="margin:0 0 20px;color:#1a1a2e;font-size:18px;">P\u00ebrsh\u00ebndetje,</h2>
+              <h2 style="margin:0 0 20px;color:#1a1a2e;font-size:18px;">P\u00ebrsh\u00ebndetje ${businessName},</h2>
 
               <p style="margin:0 0 16px;color:#4a4a68;font-size:15px;line-height:1.6;">
                 Shpresoj t'ju gjej mir\u00eb.
@@ -110,8 +110,8 @@ function getEmailHtml(): string {
 </html>`;
 }
 
-function getPlainText(): string {
-  return `Përshëndetje,
+function getPlainText(businessName: string): string {
+  return `Përshëndetje ${businessName},
 
 Shpresoj t'ju gjej mirë.
 
@@ -218,8 +218,8 @@ export async function POST(request: NextRequest) {
           to: email,
           bcc: smtpUser,
           subject: 'Ofertë promocionale për përmirësimin ose krijimin e faqes web',
-          text: getPlainText(),
-          html: getEmailHtml(),
+          text: getPlainText(biz.name),
+          html: getEmailHtml(biz.name),
         });
 
         // Mark as sent in DB
