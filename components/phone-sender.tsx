@@ -12,7 +12,10 @@ import {
   Wallet,
   RefreshCw,
   MessageSquare,
+  Star,
+  Check,
 } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +49,12 @@ interface PhoneBusiness {
   category_name: string | null;
   sms_sent: boolean;
   sms_sent_at: string | null;
+  instagram: string | null;
+  facebook: string | null;
+  twitter: string | null;
+  linkedin: string | null;
+  rating: number | null;
+  review_count: number;
 }
 
 interface SmsMessage {
@@ -69,6 +78,7 @@ export function PhoneSender() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<FilterTab>("not_sent");
   const [noWebsite, setNoWebsite] = useState(false);
+  const [potentialClients, setPotentialClients] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState({ sent: 0, total: 0 });
@@ -82,6 +92,8 @@ export function PhoneSender() {
   const [msgPage, setMsgPage] = useState(1);
   const [msgTotalPages, setMsgTotalPages] = useState(1);
   const [msgTotal, setMsgTotal] = useState(0);
+  const [singleSendBusiness, setSingleSendBusiness] = useState<PhoneBusiness | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const fetchMessages = useCallback(async () => {
     setMessagesLoading(true);
@@ -121,7 +133,7 @@ export function PhoneSender() {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/businesses/phone-list?filter=${filter}&page=${page}&limit=${PAGE_SIZE}&noWebsite=${noWebsite}`
+        `/api/businesses/phone-list?filter=${filter}&page=${page}&limit=${PAGE_SIZE}&noWebsite=${noWebsite}&potentialClients=${potentialClients}`
       );
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -136,7 +148,7 @@ export function PhoneSender() {
     } finally {
       setLoading(false);
     }
-  }, [filter, page, noWebsite]);
+  }, [filter, page, noWebsite, potentialClients]);
 
   useEffect(() => {
     fetchBusinesses();
@@ -153,7 +165,7 @@ export function PhoneSender() {
   // Reset page when filter changes
   useEffect(() => {
     setPage(1);
-  }, [filter, noWebsite]);
+  }, [filter, noWebsite, potentialClients]);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -208,6 +220,68 @@ export function PhoneSender() {
       );
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleMarkAsSent = async (businessId: string) => {
+    setActionLoading(businessId);
+    try {
+      const res = await fetch("/api/businesses", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: businessId, sms_sent: true }),
+      });
+
+      const result = await res.json();
+
+      if (result.error) {
+        toast.error(`Failed to mark as sent: ${result.error}`);
+      } else {
+        toast.success("Marked as sent");
+        await fetchBusinesses();
+      }
+    } catch (err) {
+      toast.error(
+        `Failed to mark as sent: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSendSingle = async () => {
+    if (!singleSendBusiness) return;
+
+    setActionLoading(singleSendBusiness.id);
+    try {
+      const res = await fetch("/api/send-sms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessIds: [singleSendBusiness.id] }),
+      });
+
+      const result = await res.json();
+
+      if (result.error) {
+        toast.error(`SMS error: ${result.error}`);
+      } else {
+        if (result.sent > 0) {
+          toast.success(`SMS sent successfully`);
+        }
+        if (result.failed > 0) {
+          toast.error(`Failed to send SMS`);
+        }
+        await fetchBusinesses();
+        fetchBalance();
+        fetchMessages();
+      }
+    } catch (err) {
+      toast.error(
+        `Send failed: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
+    } finally {
+      setActionLoading(null);
+      setSingleSendBusiness(null);
     }
   };
 
@@ -327,6 +401,13 @@ export function PhoneSender() {
           />
           No website only
         </label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <Checkbox
+            checked={potentialClients}
+            onCheckedChange={(checked) => setPotentialClients(checked === true)}
+          />
+          Potential clients
+        </label>
       </div>
 
       {/* Business table */}
@@ -364,9 +445,14 @@ export function PhoneSender() {
                       <TableHead>Name</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Website</TableHead>
+                      <TableHead>Socials</TableHead>
+                      <TableHead>Reviews</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="sticky right-0 bg-background text-right pr-6 border-l shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -399,6 +485,76 @@ export function PhoneSender() {
                             "\u2014"
                           )}
                         </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            {biz.instagram && (
+                              <a
+                                href={biz.instagram}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-pink-600 hover:text-pink-700 transition-colors"
+                                title="Instagram"
+                              >
+                                <Icon icon="mdi:instagram" className="h-4 w-4" />
+                              </a>
+                            )}
+                            {biz.facebook && (
+                              <a
+                                href={biz.facebook}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-700 transition-colors"
+                                title="Facebook"
+                              >
+                                <Icon icon="mdi:facebook" className="h-4 w-4" />
+                              </a>
+                            )}
+                            {biz.twitter && (
+                              <a
+                                href={biz.twitter}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sky-500 hover:text-sky-600 transition-colors"
+                                title="Twitter"
+                              >
+                                <Icon icon="mdi:twitter" className="h-4 w-4" />
+                              </a>
+                            )}
+                            {biz.linkedin && (
+                              <a
+                                href={biz.linkedin}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-700 hover:text-blue-800 transition-colors"
+                                title="LinkedIn"
+                              >
+                                <Icon icon="mdi:linkedin" className="h-4 w-4" />
+                              </a>
+                            )}
+                            {!biz.instagram && !biz.facebook && !biz.twitter && !biz.linkedin && (
+                              <span className="text-muted-foreground">{"\u2014"}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {biz.rating !== null || biz.review_count > 0 ? (
+                            <div className="flex items-center gap-1.5">
+                              {biz.rating !== null && (
+                                <div className="flex items-center gap-0.5">
+                                  <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-sm font-medium">{biz.rating.toFixed(1)}</span>
+                                </div>
+                              )}
+                              {biz.review_count > 0 && (
+                                <span className="text-sm text-muted-foreground">
+                                  ({biz.review_count})
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">{"\u2014"}</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-muted-foreground">
                           {biz.emails?.[0] || "\u2014"}
                         </TableCell>
@@ -422,6 +578,32 @@ export function PhoneSender() {
                           ) : (
                             <Badge variant="outline">Not sent</Badge>
                           )}
+                        </TableCell>
+                        <TableCell className="sticky right-0 bg-background text-right pr-6 border-l shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleMarkAsSent(biz.id)}
+                              disabled={biz.sms_sent || actionLoading === biz.id || sending}
+                              title="Mark as sent (database only)"
+                            >
+                              {actionLoading === biz.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => setSingleSendBusiness(biz)}
+                              disabled={biz.sms_sent || actionLoading === biz.id || sending}
+                              title="Send SMS"
+                            >
+                              <Send className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -584,6 +766,41 @@ export function PhoneSender() {
           )}
         </CardContent>
       </Card>
+
+      {/* Single SMS Send Dialog */}
+      <AlertDialog open={!!singleSendBusiness} onOpenChange={(open) => !open && setSingleSendBusiness(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm SMS Send</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to send an SMS message to{" "}
+              <strong>{singleSendBusiness?.name}</strong> at{" "}
+              <strong>{singleSendBusiness?.phone}</strong>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading === singleSendBusiness?.id}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSendSingle}
+              disabled={actionLoading === singleSendBusiness?.id}
+            >
+              {actionLoading === singleSendBusiness?.id ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Message
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

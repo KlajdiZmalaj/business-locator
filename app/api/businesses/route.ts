@@ -3,6 +3,42 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { BusinessesResponse } from '@/lib/types';
 import { requireAuth } from '@/lib/api-auth';
 
+export async function PATCH(request: NextRequest): Promise<NextResponse<{ success: boolean } | { error: string }>> {
+  const auth = await requireAuth();
+  if (auth.response) return auth.response;
+
+  try {
+    const body = await request.json();
+    const { id, sms_sent } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from('businesses')
+      .update({
+        sms_sent: sms_sent === true,
+        sms_sent_at: sms_sent === true ? new Date().toISOString() : null
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('[Businesses] Update error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[Businesses] Update error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error occurred' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(request: NextRequest): Promise<NextResponse<{ success: boolean } | { error: string }>> {
   const auth = await requireAuth();
   if (auth.response) return auth.response;

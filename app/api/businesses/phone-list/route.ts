@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('businesses')
-      .select('id, name, phone, website, emails, category_name, sms_sent, sms_sent_at', { count: 'exact' })
+      .select('id, name, phone, website, emails, category_name, sms_sent, sms_sent_at, instagram, facebook, twitter, linkedin, rating, review_count', { count: 'exact' })
       .not('phone', 'is', null)
       .neq('phone', '');
 
@@ -30,6 +30,14 @@ export async function GET(request: NextRequest) {
     const noWebsite = searchParams.get('noWebsite');
     if (noWebsite === 'true') {
       query = query.or('website.is.null,website.eq.');
+    }
+
+    const potentialClients = searchParams.get('potentialClients');
+    if (potentialClients === 'true') {
+      query = query
+        .or('website.is.null,website.eq.')
+        .or('phone.like.+35568%,phone.like.+355 68%')
+        .gte('review_count', 10);
     }
 
     query = query.order('name', { ascending: true }).range(offset, offset + limit - 1);
