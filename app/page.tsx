@@ -28,13 +28,7 @@ import {
 } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 const features = [
@@ -65,8 +59,7 @@ const features = [
   {
     icon: Phone,
     title: "SMS Campaigns",
-    description:
-      "Reach businesses via SMS using collected phone numbers. Track delivery and balance in real time.",
+    description: "Reach businesses via SMS using collected phone numbers. Track delivery and balance in real time.",
   },
   {
     icon: FileSpreadsheet,
@@ -167,14 +160,9 @@ export default function LandingPage() {
         <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Icon
-                icon="game-icons:metal-hand"
-                className="h-5 w-5 text-primary-foreground"
-              />
+              <Icon icon="game-icons:metal-hand" className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-lg font-bold tracking-tight">
-              Skrrapi iProPixel
-            </span>
+            <span className="text-lg font-bold tracking-tight">Skrrapi iProPixel</span>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" asChild>
@@ -207,14 +195,13 @@ export default function LandingPage() {
               </Badge>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Find, Collect & Reach{" "}
-                <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                <span className="bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                   Local Businesses
                 </span>
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-base text-muted-foreground sm:text-lg">
-                Our custom-built crawling engine extracts business data from
-                Google Maps at scale, organizes it in a powerful dashboard, and
-                lets you launch email or SMS outreach -- all from one place.
+                Our custom-built crawling engine extracts business data from Google Maps at scale, organizes it in a
+                powerful dashboard, and lets you launch email or SMS outreach -- all from one place.
               </p>
               <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Button size="lg" className="w-full sm:w-auto" asChild>
@@ -223,12 +210,7 @@ export default function LandingPage() {
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full sm:w-auto"
-                  asChild
-                >
+                <Button variant="outline" size="lg" className="w-full sm:w-auto" asChild>
                   <a href="#features">
                     Learn More
                     <ChevronRight className="h-4 w-4" />
@@ -256,36 +238,20 @@ export default function LandingPage() {
                       { label: "With Email", value: "864" },
                       { label: "Avg Rating", value: "4.3" },
                     ].map((stat) => (
-                      <div
-                        key={stat.label}
-                        className="rounded-lg border bg-background p-3"
-                      >
-                        <p className="text-[10px] text-muted-foreground sm:text-xs">
-                          {stat.label}
-                        </p>
-                        <p className="mt-1 text-lg font-bold sm:text-xl">
-                          {stat.value}
-                        </p>
+                      <div key={stat.label} className="rounded-lg border bg-background p-3">
+                        <p className="text-[10px] text-muted-foreground sm:text-xs">{stat.label}</p>
+                        <p className="mt-1 text-lg font-bold sm:text-xl">{stat.value}</p>
                       </div>
                     ))}
                   </div>
                   {/* Mock table rows */}
                   <div className="mt-4 space-y-2">
                     {[1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-3 rounded-md border bg-background p-3"
-                      >
+                      <div key={i} className="flex items-center gap-3 rounded-md border bg-background p-3">
                         <div className="h-8 w-8 rounded-md bg-muted" />
                         <div className="flex-1 space-y-1.5">
-                          <div
-                            className="h-3 rounded bg-muted"
-                            style={{ width: `${60 + i * 10}%` }}
-                          />
-                          <div
-                            className="h-2 rounded bg-muted/60"
-                            style={{ width: `${40 + i * 8}%` }}
-                          />
+                          <div className="h-3 rounded bg-muted" style={{ width: `${60 + i * 10}%` }} />
+                          <div className="h-2 rounded bg-muted/60" style={{ width: `${40 + i * 8}%` }} />
                         </div>
                         <div className="hidden gap-1 sm:flex">
                           <div className="h-6 w-14 rounded bg-primary/10" />
@@ -328,16 +294,12 @@ export default function LandingPage() {
                 Everything you need to find and reach businesses
               </h2>
               <p className="mt-4 text-muted-foreground">
-                From discovery to outreach, Skrrapi gives you a complete
-                pipeline for local business data.
+                From discovery to outreach, Skrrapi gives you a complete pipeline for local business data.
               </p>
             </div>
             <div className="mx-auto mt-14 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {features.map((feature) => (
-                <Card
-                  key={feature.title}
-                  className="group relative transition-shadow hover:shadow-md"
-                >
+                <Card key={feature.title} className="group relative transition-shadow hover:shadow-md">
                   <CardHeader>
                     <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/15">
                       <feature.icon className="h-5 w-5 text-primary" />
@@ -358,27 +320,22 @@ export default function LandingPage() {
               <Badge variant="outline" className="mb-4">
                 Workflow
               </Badge>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                How it works
-              </h2>
-              <p className="mt-4 text-muted-foreground">
-                Four simple steps from search to outreach.
-              </p>
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">How it works</h2>
+              <p className="mt-4 text-muted-foreground">Four simple steps from search to outreach.</p>
             </div>
             <div className="mx-auto mt-14 grid max-w-4xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {workflow.map((item, index) => (
                 <div key={item.step} className="relative">
                   {index < workflow.length - 1 && (
-                    <div className="absolute right-0 top-8 hidden h-px w-6 bg-border lg:block" style={{ right: "-12px" }} />
+                    <div
+                      className="absolute right-0 top-8 hidden h-px w-6 bg-border lg:block"
+                      style={{ right: "-12px" }}
+                    />
                   )}
                   <div className="flex flex-col items-start">
-                    <span className="mb-3 text-4xl font-black text-primary/15">
-                      {item.step}
-                    </span>
+                    <span className="mb-3 text-4xl font-black text-primary/15">{item.step}</span>
                     <h3 className="mb-2 text-sm font-semibold">{item.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {item.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
                   </div>
                 </div>
               ))}
@@ -397,16 +354,13 @@ export default function LandingPage() {
                 Enterprise-grade crawling infrastructure
               </h2>
               <p className="mt-4 text-muted-foreground">
-                Six proprietary layers work together to deliver undetectable,
-                reliable, and blazing-fast data extraction from Google Maps.
+                Six proprietary layers work together to deliver undetectable, reliable, and blazing-fast data extraction
+                from Google Maps.
               </p>
             </div>
             <div className="mx-auto mt-14 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {engineLayers.map((layer) => (
-                <Card
-                  key={layer.title}
-                  className="group relative border-dashed transition-shadow hover:shadow-md"
-                >
+                <Card key={layer.title} className="group relative border-dashed transition-shadow hover:shadow-md">
                   <CardHeader>
                     <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/15">
                       <layer.icon className="h-5 w-5 text-primary" />
@@ -428,13 +382,10 @@ export default function LandingPage() {
                 <Badge variant="outline" className="mb-4">
                   Rich Data
                 </Badge>
-                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                  35+ data points per business
-                </h2>
+                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">35+ data points per business</h2>
                 <p className="mt-4 text-muted-foreground">
-                  Our Chromium-based extraction pipeline normalizes every field
-                  into clean, structured data ready for filtering, export, and
-                  outreach.
+                  Our Chromium-based extraction pipeline normalizes every field into clean, structured data ready for
+                  filtering, export, and outreach.
                 </p>
                 <div className="mt-8 grid grid-cols-2 gap-3">
                   {[
@@ -465,9 +416,7 @@ export default function LandingPage() {
                       <div className="min-w-0 flex-1 space-y-2">
                         <div>
                           <p className="font-semibold">Coffee House Tirana</p>
-                          <p className="text-xs text-muted-foreground">
-                            Rruga Myslym Shyri, Blloku, Tirana
-                          </p>
+                          <p className="text-xs text-muted-foreground">Rruga Myslym Shyri, Blloku, Tirana</p>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           <Badge variant="secondary" className="text-[10px]">
@@ -488,14 +437,8 @@ export default function LandingPage() {
                           </Badge>
                         </div>
                         <div className="flex gap-2">
-                          <Icon
-                            icon="mdi:instagram"
-                            className="h-4 w-4 text-muted-foreground"
-                          />
-                          <Icon
-                            icon="mdi:facebook"
-                            className="h-4 w-4 text-muted-foreground"
-                          />
+                          <Icon icon="mdi:instagram" className="h-4 w-4 text-muted-foreground" />
+                          <Icon icon="mdi:facebook" className="h-4 w-4 text-muted-foreground" />
                           <Globe className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </div>
@@ -511,9 +454,7 @@ export default function LandingPage() {
                       <div className="min-w-0 flex-1 space-y-2">
                         <div>
                           <p className="font-semibold">Digital Agency AL</p>
-                          <p className="text-xs text-muted-foreground">
-                            Rruga Bardhyl, Komuna e Parisit, Tirana
-                          </p>
+                          <p className="text-xs text-muted-foreground">Rruga Bardhyl, Komuna e Parisit, Tirana</p>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           <Badge variant="secondary" className="text-[10px]">
@@ -530,14 +471,8 @@ export default function LandingPage() {
                           </Badge>
                         </div>
                         <div className="flex gap-2">
-                          <Icon
-                            icon="mdi:linkedin"
-                            className="h-4 w-4 text-muted-foreground"
-                          />
-                          <Icon
-                            icon="mdi:facebook"
-                            className="h-4 w-4 text-muted-foreground"
-                          />
+                          <Icon icon="mdi:linkedin" className="h-4 w-4 text-muted-foreground" />
+                          <Icon icon="mdi:facebook" className="h-4 w-4 text-muted-foreground" />
                           <Globe className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </div>
@@ -552,9 +487,7 @@ export default function LandingPage() {
         {/* Tech stack */}
         <section className="border-t bg-muted/20">
           <div className="container mx-auto px-4 py-16 sm:px-6 lg:px-8">
-            <p className="mb-8 text-center text-sm font-medium text-muted-foreground">
-              Built with modern technologies
-            </p>
+            <p className="mb-8 text-center text-sm font-medium text-muted-foreground">Built with modern technologies</p>
             <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-center gap-x-10 gap-y-6">
               {techStack.map((tech) => (
                 <div
@@ -574,17 +507,11 @@ export default function LandingPage() {
           <div className="container mx-auto px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
             <div className="mx-auto max-w-2xl rounded-2xl border bg-card p-8 text-center shadow-lg sm:p-12">
               <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                <Icon
-                  icon="game-icons:metal-hand"
-                  className="h-7 w-7 text-primary"
-                />
+                <Icon icon="game-icons:metal-hand" className="h-7 w-7 text-primary" />
               </div>
-              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                Ready to start scraping?
-              </h2>
+              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Ready to start scraping?</h2>
               <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-                Sign in to your admin dashboard and start discovering businesses
-                in any city around the world.
+                Sign in to your admin dashboard and start discovering businesses in any city around the world.
               </p>
               <div className="mt-8">
                 <Button size="lg" asChild>
@@ -604,16 +531,11 @@ export default function LandingPage() {
         <div className="container mx-auto flex flex-col items-center justify-between gap-4 px-4 py-8 sm:flex-row sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
-              <Icon
-                icon="game-icons:metal-hand"
-                className="h-3.5 w-3.5 text-primary-foreground"
-              />
+              <Icon icon="game-icons:metal-hand" className="h-3.5 w-3.5 text-primary-foreground" />
             </div>
             <span className="text-sm font-semibold">Skrrapi iProPixel</span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Google Maps business scraper -- works worldwide.
-          </p>
+          <p className="text-xs text-muted-foreground">Google Maps business scraper -- works worldwide.</p>
         </div>
       </footer>
     </div>
