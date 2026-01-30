@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
-import { Navbar } from "@/components/navbar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Google Maps Business Locator",
+  title: "Skrrapi iProPixel",
   description: "Locate and manage business data from Google Maps",
 };
 
@@ -26,13 +25,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <div className="min-h-screen bg-background">
-          <Navbar />
-          {children}
-        </div>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <div className="min-h-screen bg-background">{children}</div>
         <Toaster position="top-right" richColors />
       </body>
     </html>

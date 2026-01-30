@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/api-auth';
 
 const SMSTO_API_URL = 'https://api.sms.to/sms/send';
 const SMS_SENDER_ID = 'iProPixel';
@@ -22,6 +23,9 @@ function sleep(ms: number) {
 const DELAY_MS = 5000;
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth.response) return auth.response;
+
   try {
     const { businessIds } = await request.json();
 

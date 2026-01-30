@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { requireAuth } from "@/lib/api-auth";
 
 export interface StatsResponse {
   totalBusinesses: number;
@@ -18,6 +19,9 @@ export interface StatsResponse {
 }
 
 export async function GET(): Promise<NextResponse<StatsResponse | { error: string }>> {
+  const auth = await requireAuth();
+  if (auth.response) return auth.response;
+
   try {
     const supabase = getSupabaseAdmin();
 

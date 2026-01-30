@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import nodemailer from 'nodemailer';
+import { requireAuth } from '@/lib/api-auth';
 
 const DELAY_MS = 15000;
 
@@ -142,6 +143,9 @@ function sleep(ms: number) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth.response) return auth.response;
+
   try {
     const { businessIds } = await request.json();
 

@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function GET() {
+  const auth = await requireAuth();
+  if (auth.response) return auth.response;
+
   if (!process.env.SMSTO_API_KEY) {
     return NextResponse.json(
       { error: 'SMSTO_API_KEY environment variable is not configured' },

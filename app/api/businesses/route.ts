@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { BusinessesResponse } from '@/lib/types';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function DELETE(request: NextRequest): Promise<NextResponse<{ success: boolean } | { error: string }>> {
+  const auth = await requireAuth();
+  if (auth.response) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -33,6 +37,9 @@ export async function DELETE(request: NextRequest): Promise<NextResponse<{ succe
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse<BusinessesResponse | { error: string }>> {
+  const authGet = await requireAuth();
+  if (authGet.response) return authGet.response;
+
   try {
     const { searchParams } = new URL(request.url);
 

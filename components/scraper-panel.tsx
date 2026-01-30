@@ -210,15 +210,15 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
         <CardDescription>Find businesses in Albania</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Apify API Key */}
+        {/*  API Key */}
         <div className="space-y-2">
-          <Label htmlFor="apify-key">Apify API Key</Label>
+          <Label htmlFor="apify-key">API Key</Label>
           <div className="relative">
             <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="apify-key"
               type="password"
-              placeholder="Enter your Apify API key..."
+              placeholder="Enter your API key..."
               value={apifyApiKey}
               onChange={(e) => setApifyApiKey(e.target.value)}
               disabled={isLoading}
@@ -354,7 +354,12 @@ export function ScraperPanel({ onScrapeComplete }: ScraperPanelProps) {
         {/* Scrape Button */}
         <Button
           onClick={handleScrape}
-          disabled={isLoading || !apifyApiKey.trim() || !searchQuery.trim() || (useNeighborhoods && selectedNeighborhoods.length === 0)}
+          disabled={
+            isLoading ||
+            !apifyApiKey.trim() ||
+            !searchQuery.trim() ||
+            (useNeighborhoods && selectedNeighborhoods.length === 0)
+          }
           className="w-full"
           size="lg"
         >

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { ScrapeResponse, ScrapedBusiness } from "@/lib/types";
 import { ApifyClient } from "apify-client";
+import { requireAuth } from "@/lib/api-auth";
 
 const APIFY_API_KEY = process.env.APIFY_API_KEY;
 const GOOGLE_MAPS_SCRAPER_ACTOR = "nwua9Gu5YrADL7ZDj";
@@ -296,6 +297,9 @@ function createInsertRecord(business: ScrapedBusiness, searchQuery: string, now:
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<ScrapeResponse>> {
+  const auth = await requireAuth();
+  if (auth.response) return auth.response as unknown as NextResponse<ScrapeResponse>;
+
   const startTime = Date.now();
   let loggerCleanup: (() => void) | undefined;
 
