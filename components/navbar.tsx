@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Search, Mail, Phone, LogOut } from "lucide-react";
+import { LayoutDashboard, Search, Mail, Phone, Settings, LogOut } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { getSupabaseBrowser } from "@/lib/supabase-client";
 
@@ -15,6 +15,7 @@ export function Navbar() {
     { href: "/admin/finder", label: "Finder", icon: Search },
     { href: "/admin/email", label: "Email", icon: Mail },
     { href: "/admin/phone", label: "Phone", icon: Phone },
+    { href: "/admin/config", label: "Config", icon: Settings },
   ];
 
   const handleLogout = async () => {
