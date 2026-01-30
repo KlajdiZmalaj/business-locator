@@ -9,6 +9,9 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Wallet,
+  RefreshCw,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -45,9 +48,21 @@ interface PhoneBusiness {
   sms_sent_at: string | null;
 }
 
+interface SmsMessage {
+  id: string;
+  to: string;
+  message: string;
+  sender_id: string;
+  status: string;
+  cost: number | null;
+  created_at: string;
+  sent_at: string | null;
+}
+
 type FilterTab = "not_sent" | "sent" | "all";
 
 const PAGE_SIZE = 500;
+const MSG_PAGE_SIZE = 25;
 
 export function PhoneSender() {
   const [businesses, setBusinesses] = useState<PhoneBusiness[]>([]);
@@ -60,6 +75,47 @@ export function PhoneSender() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [balance, setBalance] = useState<{ balance: number; currency: string } | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [messages, setMessages] = useState<SmsMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [msgPage, setMsgPage] = useState(1);
+  const [msgTotalPages, setMsgTotalPages] = useState(1);
+  const [msgTotal, setMsgTotal] = useState(0);
+
+  const fetchMessages = useCallback(async () => {
+    setMessagesLoading(true);
+    try {
+      const res = await fetch(`/api/sms-messages?limit=${MSG_PAGE_SIZE}&page=${msgPage}`);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setMessages(json.data || []);
+      setMsgTotalPages(json.last_page || 1);
+      setMsgTotal(json.total || 0);
+    } catch (err) {
+      toast.error(
+        `Failed to load SMS history: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, [msgPage]);
+
+  const fetchBalance = useCallback(async () => {
+    setBalanceLoading(true);
+    try {
+      const res = await fetch("/api/sms-balance");
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setBalance(json);
+    } catch (err) {
+      toast.error(
+        `Failed to load SMS balance: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
+    } finally {
+      setBalanceLoading(false);
+    }
+  }, []);
 
   const fetchBusinesses = useCallback(async () => {
     setLoading(true);
@@ -85,6 +141,14 @@ export function PhoneSender() {
   useEffect(() => {
     fetchBusinesses();
   }, [fetchBusinesses]);
+
+  useEffect(() => {
+    fetchBalance();
+  }, [fetchBalance]);
+
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
 
   // Reset page when filter changes
   useEffect(() => {
@@ -135,6 +199,8 @@ export function PhoneSender() {
           toast.error(`Failed to send ${result.failed} messages`);
         }
         await fetchBusinesses();
+        fetchBalance();
+        fetchMessages();
       }
     } catch (err) {
       toast.error(
@@ -159,6 +225,26 @@ export function PhoneSender() {
           <Phone className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold">Phone / SMS Management</h2>
           <Badge variant="secondary">{total} businesses</Badge>
+          <div className="flex items-center gap-1.5 ml-2">
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+            {balanceLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+            ) : balance ? (
+              <span className="text-sm font-medium">
+                {balance.balance.toFixed(2)} {balance.currency}
+              </span>
+            ) : (
+              <span className="text-sm text-muted-foreground">--</span>
+            )}
+            <button
+              onClick={fetchBalance}
+              disabled={balanceLoading}
+              className="p-0.5 rounded hover:bg-muted transition-colors"
+              title="Refresh balance"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${balanceLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
 
         {selected.size > 0 && !sending && (
@@ -365,6 +451,129 @@ export function PhoneSender() {
                       setPage((p) => Math.min(totalPages, p + 1))
                     }
                     disabled={page >= totalPages || loading}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SMS History Table */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">SMS History</CardTitle>
+              <Badge variant="secondary">{msgTotal} messages</Badge>
+            </div>
+            <button
+              onClick={fetchMessages}
+              disabled={messagesLoading}
+              className="p-1.5 rounded hover:bg-muted transition-colors"
+              title="Refresh messages"
+            >
+              <RefreshCw
+                className={`h-4 w-4 text-muted-foreground ${messagesLoading ? "animate-spin" : ""}`}
+              />
+            </button>
+          </div>
+        </CardHeader>
+        <CardContent className="px-0">
+          {messagesLoading && messages.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No messages found.
+            </div>
+          ) : (
+            <>
+              <div className="max-h-[500px] overflow-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background z-10">
+                    <TableRow>
+                      <TableHead className="pl-6">To</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Sender</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Cost</TableHead>
+                      <TableHead>Sent At</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {messages.map((msg) => (
+                      <TableRow key={msg.id}>
+                        <TableCell className="pl-6 font-mono text-sm">
+                          {msg.to}
+                        </TableCell>
+                        <TableCell
+                          className="text-muted-foreground max-w-[300px] truncate"
+                          title={msg.message}
+                        >
+                          {msg.message}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {msg.sender_id || "\u2014"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              msg.status === "delivered"
+                                ? "default"
+                                : msg.status === "sent"
+                                  ? "secondary"
+                                  : msg.status === "failed" || msg.status === "rejected"
+                                    ? "destructive"
+                                    : "outline"
+                            }
+                          >
+                            {msg.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {msg.cost != null ? `${msg.cost.toFixed(4)}` : "\u2014"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {msg.sent_at
+                            ? new Date(msg.sent_at).toLocaleString()
+                            : msg.created_at
+                              ? new Date(msg.created_at).toLocaleString()
+                              : "\u2014"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Messages pagination */}
+              <div className="flex items-center justify-between px-6 pt-4 border-t mt-2">
+                <p className="text-sm text-muted-foreground">
+                  Page {msgPage} of {msgTotalPages} ({msgTotal} total)
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMsgPage((p) => Math.max(1, p - 1))}
+                    disabled={msgPage <= 1 || messagesLoading}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setMsgPage((p) => Math.min(msgTotalPages, p + 1))
+                    }
+                    disabled={msgPage >= msgTotalPages || messagesLoading}
                   >
                     Next
                     <ChevronRight className="h-4 w-4 ml-1" />

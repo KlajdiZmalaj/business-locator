@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { Vonage } from '@vonage/server-sdk';
 
-const vonage = new Vonage({
-  apiKey: process.env.VONAGE_API_KEY || '',
-  apiSecret: process.env.VONAGE_API_SECRET || '',
-});
-
-const SMS_FROM = 'iProPixel';
+const SMSTO_API_URL = 'https://api.sms.to/sms/send';
+const SMS_SENDER_ID = 'iProPixel';
 
 function getSmsText(businessName: string): string {
   return `Pershendetje ${businessName},
@@ -37,9 +32,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!process.env.VONAGE_API_KEY || !process.env.VONAGE_API_SECRET) {
+    if (!process.env.SMSTO_API_KEY) {
       return NextResponse.json(
-        { error: 'VONAGE_API_KEY and VONAGE_API_SECRET environment variables are not configured' },
+        { error: 'SMSTO_API_KEY environment variable is not configured' },
         { status: 500 }
       );
     }
@@ -82,17 +77,32 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Normalize phone: remove spaces, dashes, and leading + sign
-      phone = phone.replace(/[\s\-\(\)]/g, '').replace(/^\+/, '');
+      // Normalize phone: remove spaces, dashes, parentheses
+      phone = phone.replace(/[\s\-\(\)]/g, '');
 
       try {
         const text = getSmsText(biz.name);
+        const toNumber = phone.startsWith('+') ? phone : `+${phone}`;
+        console.log(`[SendSMS] Sending to: "${toNumber}", body length: ${text.length}, sender_id: "${SMS_SENDER_ID}"`);
 
-        await vonage.sms.send({
-          to: phone,
-          from: SMS_FROM,
-          text,
+        const response = await fetch(SMSTO_API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.SMSTO_API_KEY}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            message: text,
+            to: toNumber,
+            sender_id: SMS_SENDER_ID,
+          }),
         });
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(`SMS.to API error (${response.status}): ${errorBody}`);
+        }
 
         // Mark as sent in DB
         const { error: updateError } = await supabase
